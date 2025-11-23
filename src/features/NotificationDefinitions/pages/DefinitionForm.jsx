@@ -1,42 +1,45 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 
 export default function DefinitionForm() {
   const navigate = useNavigate();
+  const [mechanisms, setMechanisms] = useState([]);
+  const [urlConfigs, setUrlConfigs] = useState([]);
 
   const [formData, setFormData] = useState({
     id: "Auto-generated notification ID",
     name: "",
-    deliveryMechanism: "",
     filters: [], // [{ key: '', value: '' }]
     order: "1",
     notificationPreference: "",
     criticality: "Medium",
+    notificationName: "",
+    deliveryMechanism: [],
   });
+
+  useEffect(() => {
+    fetch("http://localhost:5000/api/configs")
+      .then((res) => res.json())
+      .then((data) => {
+        console.log("Fetched URL configs:", data); // ✅ Add this
+        setUrlConfigs(data);
+      })
+      .catch((err) => {
+        console.error("Error fetching URL configs:", err);
+        setUrlConfigs([]); // fallback
+      });
+  }, []);
+
+  useEffect(() => {
+    fetch("http://localhost:5000/api/mechanisms")
+      .then((res) => res.json())
+      .then((data) => setMechanisms(data))
+      .catch((err) => console.error("Error fetching mechanisms:", err));
+  }, []);
 
   // Enrich API related state
   const [enrichOpen, setEnrichOpen] = useState(false);
   const [apiConfigOpen, setApiConfigOpen] = useState(false);
-
-  // Available APIs (matches screenshots); ids kept as strings
-  const AVAILABLE_APIS = [
-    {
-      id: "GetSiteDetailsAPI",
-      name: "GetSiteDetailsAPI",
-      url: "https://f98cf68e1b6e2e67e16fa1.mockapi.io/api/v1/getSiteDetails/$Event.site_id",
-    },
-    {
-      id: "EnrichAPI",
-      name: "EnrichAPI",
-      url: "https://90a2df1014a68bf2cc43765.mockapi.io/sendNotif/$Event.deviceId",
-    },
-    {
-      id: "users",
-      name: "users",
-      url: "https://enlight-dev-qa-emphasecency.com/service/en-notification-core-service/api/emphase/site-users/$Event.site_id",
-    },
-    { id: "Google", name: "Google", url: "https://www.google.com" },
-  ];
 
   const [selectedApis, setSelectedApis] = useState([]); // array of api ids
 
@@ -84,15 +87,6 @@ export default function DefinitionForm() {
   // state for dropdown open
   const [mechOpen, setMechOpen] = useState(false);
 
-  // list of available mechanisms (can be lifted to top-level const)
-  const DELIVERY_OPTIONS = [
-    { value: "BANNER", label: "Banner" },
-    { value: "CAMPAIGN", label: "Campaign" },
-    { value: "DIGEST", label: "Digest" },
-    { value: "PUSH", label: "PUSH" },
-    { value: "SMS", label: "SMS" },
-  ];
-
   const toggleMechanism = (value) => {
     setFormData((prev) => {
       const curr = Array.isArray(prev.deliveryMechanism)
@@ -105,10 +99,6 @@ export default function DefinitionForm() {
     });
   };
 
-  const clearMechanisms = () => {
-    setFormData((prev) => ({ ...prev, deliveryMechanism: [] }));
-  };
-
   const toggleApi = (apiId) => {
     setSelectedApis((prev) =>
       prev.includes(apiId)
@@ -118,17 +108,7 @@ export default function DefinitionForm() {
   };
 
   const isFormValid = () => {
-    if (!formData.name.trim()) return false;
-    if (!formData.deliveryMechanism) return false;
-    // If there are filters, ensure keys/values are valid (optional)
-    for (const f of formData.filters) {
-      if (!f) continue;
-      if ((f.key && !f.key.trim()) || (f.value && !f.value.trim()))
-        return false;
-    }
-    // Require at least one API selected in Enrich API step before Save & Next
-    if (selectedApis.length === 0) return false;
-    return true;
+    return formData.name.trim() !== "" && formData.deliveryMechanism.length > 0;
   };
 
   const handleSaveNext = async (e) => {
@@ -141,7 +121,7 @@ export default function DefinitionForm() {
       await new Promise((r) => setTimeout(r, 600));
 
       const payload = { ...formData, selectedApis };
-      navigate("/notification-definitions/enrich-api", {
+      navigate("/notification-definitions/content", {
         state: { created: true, data: payload },
       });
     } catch (err) {
@@ -196,261 +176,6 @@ export default function DefinitionForm() {
               onChange={handleChange}
               className="w-full border border-gray-300 rounded px-3 py-2"
             />
-          </div>
-
-          {/* Delivery Mechanism */}
-          <div className="relative">
-            <label className="block font-medium mb-1">
-              Notification Delivery Mechanism *
-            </label>
-
-            <button
-              type="button"
-              onClick={() => setMechOpen((s) => !s)}
-              className="w-full flex justify-between items-center border border-gray-300 rounded px-3 py-2 bg-white"
-            >
-              <div className="text-left truncate">
-                {Array.isArray(formData.deliveryMechanism) &&
-                formData.deliveryMechanism.length > 0 ? (
-                  <>
-                    <span className="font-medium">
-                      {formData.deliveryMechanism.length} type(s) selected
-                    </span>
-                    <div className="text-xs text-gray-500">
-                      {formData.deliveryMechanism
-                        .map(
-                          (v) =>
-                            DELIVERY_OPTIONS.find((o) => o.value === v)
-                              ?.label || v
-                        )
-                        .join(", ")}
-                    </div>
-                  </>
-                ) : (
-                  <span className="text-gray-500">
-                    Select notification types
-                  </span>
-                )}
-              </div>
-
-              <div className="ml-2 text-sm text-gray-500">
-                {mechOpen ? "▲" : "▼"}
-              </div>
-            </button>
-
-            {mechOpen && (
-              <div className="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded shadow-lg">
-                <div className="p-3 space-y-2 max-h-60 overflow-auto">
-                  {DELIVERY_OPTIONS.map((opt) => {
-                    const checked =
-                      Array.isArray(formData.deliveryMechanism) &&
-                      formData.deliveryMechanism.includes(opt.value);
-                    return (
-                      <label
-                        key={opt.value}
-                        className="flex items-center space-x-3 px-2 py-1 hover:bg-gray-50 rounded"
-                      >
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          onChange={() => toggleMechanism(opt.value)}
-                          className="h-4 w-4"
-                        />
-                        <div>
-                          <div className="font-medium">{opt.label}</div>
-                          <div className="text-xs text-gray-500">
-                            {opt.value}
-                          </div>
-                        </div>
-                      </label>
-                    );
-                  })}
-                </div>
-
-                <div className="flex items-center justify-between border-t px-3 py-2">
-                  <button
-                    type="button"
-                    onClick={() => setMechOpen(false)}
-                    className="px-3 py-1 text-sm text-gray-600 rounded hover:bg-gray-100"
-                  >
-                    Done
-                  </button>
-                  <div className="flex items-center space-x-2">
-                    <button
-                      type="button"
-                      onClick={clearMechanisms}
-                      className="px-3 py-1 text-sm text-red-600 rounded hover:bg-red-50"
-                    >
-                      Clear
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Message Filter (Key-Value Tags) */}
-          {/* Message Filter (updated UI) */}
-          <div>
-            <label className="block font-medium mb-2">Message Filter</label>
-            <div className="space-y-2">
-              {formData.filters.length === 0 && (
-                <div className="text-sm text-gray-500">
-                  No tags added yet. Use the form below to add key-value pairs.
-                </div>
-              )}
-
-              {formData.filters.map((f, idx) => (
-                <div key={idx} className="flex items-center space-x-2">
-                  <input
-                    type="text"
-                    placeholder="Field Name"
-                    value={f.key}
-                    onChange={(e) =>
-                      handleFilterChange(idx, "key", e.target.value)
-                    }
-                    className="flex-1 border border-gray-300 rounded px-3 py-2"
-                  />
-                  <input
-                    type="text"
-                    placeholder="Value"
-                    value={f.value}
-                    onChange={(e) =>
-                      handleFilterChange(idx, "value", e.target.value)
-                    }
-                    className="flex-1 border border-gray-300 rounded px-3 py-2"
-                  />
-
-                  <div className="flex items-center space-x-2">
-                    <button
-                      type="button"
-                      onClick={() => addFilterAt(idx)}
-                      className="px-3 py-2 bg-green-50 text-green-600 rounded hover:bg-green-100"
-                      aria-label={`Add filter after ${idx}`}
-                      title="Add tag after"
-                    >
-                      ＋
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => removeFilter(idx)}
-                      className="px-3 py-2 bg-red-100 text-red-600 rounded hover:bg-red-200"
-                      aria-label={`Remove filter ${idx}`}
-                      title="Remove tag"
-                    >
-                      −
-                    </button>
-                  </div>
-                </div>
-              ))}
-
-              <div className="flex items-center space-x-3">
-                <button
-                  type="button"
-                  onClick={addFilter}
-                  className="px-3 py-2 bg-blue-50 text-blue-600 rounded hover:bg-blue-100 text-sm"
-                >
-                  ＋ Add Tag
-                </button>
-
-                <div className="text-sm text-gray-600">
-                  {/* Show a preview of added tags and count like the screenshot */}
-                  {formData.filters.length > 0 ? (
-                    <>
-                      <span className="font-medium">Added Tags:</span>{" "}
-                      <span className="ml-2">
-                        {formData.filters
-                          .filter(Boolean)
-                          .map((t) => `${t.key || "—"}:${t.value || "—"}`)
-                          .join(", ")}
-                      </span>
-                      <span className="ml-3 text-gray-500">
-                        Total tags: {formData.filters.length}
-                      </span>
-                    </>
-                  ) : (
-                    <span className="text-gray-500">No tags added</span>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Order */}
-          <div>
-            <label htmlFor="order" className="block font-medium mb-1">
-              Order
-            </label>
-            <select
-              id="order"
-              name="order"
-              value={formData.order}
-              onChange={handleChange}
-              className="w-full border border-gray-300 rounded px-3 py-2"
-            >
-              <option value="1">1</option>
-              <option value="2">2</option>
-              <option value="3">3</option>
-              <option value="4">4</option>
-              <option value="5">5</option>
-            </select>
-          </div>
-
-          {/* Enrich API (collapsible) */}
-          <div className="border rounded">
-            <button
-              type="button"
-              onClick={() => setEnrichOpen((s) => !s)}
-              className="w-full flex justify-between items-center px-4 py-3 text-left"
-            >
-              <span className="font-medium">Enrich API</span>
-              <span className="text-sm text-gray-500">
-                {enrichOpen ? "▼" : "▶"}
-              </span>
-            </button>
-
-            {enrichOpen && (
-              <div className="px-4 py-3 border-t space-y-3">
-                <div className="text-sm text-gray-600">
-                  Select an API to enable
-                </div>
-                <div className="space-y-2">
-                  {AVAILABLE_APIS.map((api) => (
-                    <label key={api.id} className="flex items-start space-x-3">
-                      <input
-                        type="checkbox"
-                        checked={selectedApis.includes(api.id)}
-                        onChange={() => toggleApi(api.id)}
-                        className="mt-1"
-                      />
-                      <div className="flex-1">
-                        <div className="font-medium">{api.name}</div>
-                        <div className="text-xs text-gray-500 break-all">
-                          {api.url}
-                        </div>
-                      </div>
-                    </label>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* API Configuration (collapsible) */}
-          <div className="border rounded">
-            <button
-              type="button"
-              onClick={() => setApiConfigOpen((s) => !s)}
-              className="w-full flex justify-between items-center px-4 py-3 text-left"
-            >
-              <span className="font-medium">API Configuration</span>
-              <span className="text-sm text-gray-500">
-                {apiConfigOpen ? "▼" : "▶"}
-              </span>
-            </button>
-
-            {apiConfigOpen && <p></p>}
           </div>
 
           <div>
@@ -513,7 +238,6 @@ export default function DefinitionForm() {
             </select>
           </div>
 
-          {/* Replace your existing Criticality block with this */}
           <div className="relative">
             <label className="block font-medium mb-1">Criticality</label>
 
@@ -614,6 +338,237 @@ export default function DefinitionForm() {
 
             <div className="text-sm text-gray-500 mt-2">
               Configure API-specific settings for selected APIs above.
+            </div>
+          </div>
+
+          {/* Order */}
+          <div>
+            <label htmlFor="order" className="block font-medium mb-1">
+              Order
+            </label>
+            <select
+              id="order"
+              name="order"
+              value={formData.order}
+              onChange={handleChange}
+              className="w-full border border-gray-300 rounded px-3 py-2"
+            >
+              <option value="1">1</option>
+              <option value="2">2</option>
+              <option value="3">3</option>
+              <option value="4">4</option>
+              <option value="5">5</option>
+            </select>
+          </div>
+
+          {/* Delivery Mechanism */}
+          <div className="relative">
+            <label className="block font-medium mb-1">
+              Notification Delivery Mechanism *
+            </label>
+
+            <button
+              type="button"
+              onClick={() => setMechOpen((s) => !s)}
+              className="w-full flex justify-between items-center border border-gray-300 rounded px-3 py-2 bg-white"
+              aria-expanded={mechOpen}
+            >
+              <span className="text-gray-700">
+                {formData.deliveryMechanism.length > 0
+                  ? `${formData.deliveryMechanism.length} type(s) selected`
+                  : "Select delivery mechanisms"}
+              </span>
+              <svg
+                className={`w-4 h-4 text-gray-500 transform ${
+                  mechOpen ? "rotate-180" : ""
+                }`}
+                viewBox="0 0 20 20"
+                fill="currentColor"
+              >
+                <path
+                  fillRule="evenodd"
+                  d="M10 12a1 1 0 01-.707-.293l-3-3a1 1 0 111.414-1.414L10 9.586l2.293-2.293a1 1 0 111.414 1.414l-3 3A1 1 0 0110 12z"
+                  clipRule="evenodd"
+                />
+              </svg>
+            </button>
+
+            {mechOpen && (
+              <ul className="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded shadow-lg max-h-60 overflow-auto">
+                {mechanisms.map((m) => {
+                  const selected = formData.deliveryMechanism.includes(m.name);
+                  return (
+                    <li
+                      key={m.id}
+                      onClick={() => toggleMechanism(m.name)}
+                      className={`flex items-center justify-between px-3 py-2 cursor-pointer hover:bg-blue-50 ${
+                        selected ? "bg-blue-50" : ""
+                      }`}
+                    >
+                      <span className="text-gray-700">
+                        {m.name} ({m.type})
+                      </span>
+                      {selected && (
+                        <svg
+                          className="w-4 h-4 text-orange-500"
+                          viewBox="0 0 20 20"
+                          fill="currentColor"
+                        >
+                          <path
+                            fillRule="evenodd"
+                            d="M16.707 5.293a1 1 0 00-1.414 0L8 12.586 4.707 9.293a1 1 0 10-1.414 1.414l4 4a1 1 0 001.414 0l8-8a1 1 0 000-1.414z"
+                            clipRule="evenodd"
+                          />
+                        </svg>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+
+          {/* Enrich API (collapsible) */}
+          <div className="border rounded">
+            <button
+              type="button"
+              onClick={() => setEnrichOpen((s) => !s)}
+              className="w-full flex justify-between items-center px-4 py-3 text-left"
+            >
+              <span className="font-medium">Enrich API</span>
+              <span className="text-sm text-gray-500">
+                {enrichOpen ? "▼" : "▶"}
+              </span>
+            </button>
+
+            {enrichOpen && (
+              <div className="px-4 py-3 border-t space-y-3">
+                <div className="text-sm text-gray-600">
+                  Select an API to enable
+                </div>
+                <div className="space-y-2">
+                  {urlConfigs.map((api) => (
+                    <label key={api.id} className="flex items-start space-x-3">
+                      <input
+                        type="checkbox"
+                        checked={selectedApis.includes(api.apiName)}
+                        onChange={() => toggleApi(api.apiName)}
+                        className="mt-1"
+                      />
+                      <div className="flex-1">
+                        <div className="font-medium">{api.apiName}</div>
+                        <div className="text-xs text-gray-500 break-all">
+                          {api.hostUrl}
+                        </div>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* API Configuration (collapsible) */}
+          <div className="border rounded">
+            <button
+              type="button"
+              onClick={() => setApiConfigOpen((s) => !s)}
+              className="w-full flex justify-between items-center px-4 py-3 text-left"
+            >
+              <span className="font-medium">API Configuration</span>
+              <span className="text-sm text-gray-500">
+                {apiConfigOpen ? "▼" : "▶"}
+              </span>
+            </button>
+
+            {apiConfigOpen && <p></p>}
+          </div>
+
+          {/* Message Filter (Key-Value Tags) */}
+          {/* Message Filter (updated UI) */}
+          <div>
+            <label className="block font-medium mb-2">Message Filter</label>
+            <div className="space-y-2">
+              {formData.filters.length === 0 && (
+                <div className="text-sm text-gray-500">
+                  No tags added yet. Use the form below to add key-value pairs.
+                </div>
+              )}
+
+              {formData.filters.map((f, idx) => (
+                <div key={idx} className="flex items-center space-x-2">
+                  <input
+                    type="text"
+                    placeholder="Field Name"
+                    value={f.key}
+                    onChange={(e) =>
+                      handleFilterChange(idx, "key", e.target.value)
+                    }
+                    className="flex-1 border border-gray-300 rounded px-3 py-2"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Value"
+                    value={f.value}
+                    onChange={(e) =>
+                      handleFilterChange(idx, "value", e.target.value)
+                    }
+                    className="flex-1 border border-gray-300 rounded px-3 py-2"
+                  />
+
+                  <div className="flex items-center space-x-2">
+                    <button
+                      type="button"
+                      onClick={() => addFilterAt(idx)}
+                      className="px-3 py-2 bg-green-50 text-green-600 rounded hover:bg-green-100"
+                      aria-label={`Add filter after ${idx}`}
+                      title="Add tag after"
+                    >
+                      ＋
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => removeFilter(idx)}
+                      className="px-3 py-2 bg-red-100 text-red-600 rounded hover:bg-red-200"
+                      aria-label={`Remove filter ${idx}`}
+                      title="Remove tag"
+                    >
+                      −
+                    </button>
+                  </div>
+                </div>
+              ))}
+
+              <div className="flex items-center space-x-3">
+                <button
+                  type="button"
+                  onClick={addFilter}
+                  className="px-3 py-2 bg-blue-50 text-blue-600 rounded hover:bg-blue-100 text-sm"
+                >
+                  ＋ Add Tag
+                </button>
+
+                <div className="text-sm text-gray-600">
+                  {/* Show a preview of added tags and count like the screenshot */}
+                  {formData.filters.length > 0 ? (
+                    <>
+                      <span className="font-medium">Added Tags:</span>{" "}
+                      <span className="ml-2">
+                        {formData.filters
+                          .filter(Boolean)
+                          .map((t) => `${t.key || "—"}:${t.value || "—"}`)
+                          .join(", ")}
+                      </span>
+                      <span className="ml-3 text-gray-500">
+                        Total tags: {formData.filters.length}
+                      </span>
+                    </>
+                  ) : (
+                    <span className="text-gray-500">No tags added</span>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
 

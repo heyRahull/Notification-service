@@ -10,6 +10,8 @@ import UrlConfigPage from './features/UrlConfiguration/pages/UrlConfigPage';
 import ContextApiForm from './features/UrlConfiguration/pages/ContextApiForm'
 import CampaignsPage from './features/Campaign/pages/CampaignsPage';
 import DefinitionForm from './features/NotificationDefinitions/pages/DefinitionForm';
+import NotificationContentScreen from './features/NotificationDefinitions/pages/NotificationContentScreen';
+import NotificationWorkflowForm from './features/NotificationDefinitions/pages/NotificationWorkflowForm';
 import MechanismForm from './features/DeliveryMechanisms/pages/MechanismForm';
 
 function App() {
@@ -45,6 +47,9 @@ function App() {
           <Route path="definitions" element={<DefinitionsPage />} />
           <Route path="definitions/new" element={<DefinitionForm />} />
           <Route path="definitions/:id/edit" element={<DefinitionForm />} />
+          <Route path="notification-definitions/content" element={<NotificationContentScreen />} />
+          <Route path="notification-definitions/workflow" element={<NotificationWorkflowForm />} />
+
 
           {/* Delivery Mechanisms Routes */}
           <Route path="delivery-mechanisms" element={<MechanismsPage mechanisms={mechanisms} />} />
