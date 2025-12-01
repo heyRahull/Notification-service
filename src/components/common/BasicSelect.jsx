@@ -21,6 +21,7 @@ export default function BasicSelect({
         <Select
           labelId={`${id}-label`}
           id={id}
+          name={id}  
           value={value}
           label={label}
           onChange={onChange}
